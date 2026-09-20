@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 // FIX 1: Use ENV - no more blocking!
-const GROQ_API_KEY ="gsk zthku1MpsC5eWFKkGUEsWGdyb3FYMF4JdHPP4M7hK8lExv8Cd5Fgm", process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
+const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
 const META_MODEL = "llama-3.3-70b-versatile";
 
 const COUNTRIES = [
