@@ -1,0 +1,40 @@
+import { NextResponse } from "next/server";
+
+function cleanAll(text: string) {
+  return text
+    .replaceAll("**", "")
+    .replaceAll("__", "")
+    .replaceAll("##", "")
+    .replaceAll("###", "")
+    .replaceAll("|", " ")
+    .replaceAll("---", " ")
+    .replaceAll(":::", "")
+    .trim();
+}
+
+export async function POST(req: Request) {
+  try {
+    const { messages } = await req.json();
+    const systemPrompt = `You are LARDI AI, Mama Lardi built by Albert in Kumasi Ghana. 
+    ABSOLUTE RULE: Never use ** or __ or ## or ### or ::: or | or markdown tables. 
+    Write only plain simple English like Ghanaian mother. No bold, no headings, no tables. Use dash or numbers for lists.`;
+    
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: systemPrompt }, ...messages]
+      })
+    });
+    const data = await r.json();
+    let reply = data.choices?.[0]?.message?.content || "Chale small network issue Boss";
+    reply = cleanAll(reply);
+    return NextResponse.json({ reply });
+  } catch (e) {
+    return NextResponse.json({ reply: "Mama Lardi small error, try again Boss" });
+  }
+}
