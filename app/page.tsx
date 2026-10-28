@@ -1,20 +1,9 @@
-{
-  "name": "lardi-ai",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "next": "14.2.5",
-    "react": "^18",
-    "react-dom": "^18"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "typescript": "^5"
-  }
+"use client";
+import { useState } from "react";
+const clean = (t:string)=>t.replaceAll("**","").replaceAll("__","").replaceAll("##","").replaceAll("|"," ").replaceAll("---","").trim();
+export default function Home(){
+  const [msgs,setMsgs]=useState<any[]>([]); const [input,setInput]=useState(""); const [load,setLoad]=useState(false); const [speakId,setSpeakId]=useState<number|null>(null);
+  const speak=(txt:string,id:number)=>{ if(speakId===id){speechSynthesis.cancel(); setSpeakId(null); return;} speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(clean(txt)); u.onend=()=>setSpeakId(null); setSpeakId(id); speechSynthesis.speak(u); };
+  const send=async()=>{ if(!input.trim())return; const uMsg={role:"user",content:input}; setMsgs(p=>[...p,uMsg]); setInput(""); setLoad(true); const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:[...msgs,uMsg]})}); const data=await res.json(); setMsgs(p=>[...p,{role:"assistant",content:clean(data.reply)}]); setLoad(false); };
+  return (<div style={{maxWidth:600,margin:"0 auto",padding:16,background:"#000",minHeight:"100vh",color:"#FFD700"}}><h1>🇬🇭 LARDI AI - Mama Lardi 💙 | Built by Albert 🔥</h1>{msgs.map((m,i)=>(<div key={i} style={{background:m.role==="user"?"#DCF8C6":"#222",color:"#fff",padding:10,margin:"8px 0",borderRadius:10}}><p>{m.content}</p>{m.role==="assistant"&&<button onClick={()=>speak(m.content,i)} style={{marginTop:6}}>{speakId===i?"⏹️ Stop Reading":"🔊 Tap to Read"}</button>}</div>))}{load&&<p>Mama Lardi dey type...</p>}<div style={{display:"flex",gap:8}}><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder="Ask Mama Lardi..." style={{flex:1,padding:10}}/><button onClick={send}>↑</button></div></div>);
 }
