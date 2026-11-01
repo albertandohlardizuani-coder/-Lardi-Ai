@@ -2,23 +2,22 @@
 import { useState, useRef, useEffect } from "react";
 
 type Msg = { role: "user" | "ai"; content: string; time: string };
-type Mode = "clean" | "spicy";
 
 export default function LardiAI() {
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([
+    { role: "ai", content: "Hello Boss! 🇬🇭 I am Mama Lardi! Ask me anything - Natural Resources, pictures, anything!", time: "23:27" }
+  ]);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
-  const [mode, setMode] = useState<Mode>("clean");
-  const [ageOk, setAgeOk] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const getTime = () => new Date().toLocaleString("en-GH", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short", hour12: true });
+  const getTime = () => new Date().toLocaleTimeString("en-GH", { hour: "2-digit", minute: "2-digit", hour12: false });
   useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
 
-  // 🎙 MIC LIKE CHATGPT
+  // 🎙 MIC LIKE CHATGPT - When tap, ready to talk
   const startMic = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert("Mic needs Chrome!"); return; }
+    if (!SR) { alert("Use Chrome for mic!"); return; }
     const rec = new SR();
     rec.lang = "en-US";
     rec.onstart = () => setListening(true);
@@ -27,74 +26,108 @@ export default function LardiAI() {
     rec.start();
   };
 
-  // 🗣 VOICE REPLY LIKE CHATGPT
-  const speak = (text: string) => {
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "en-US";
-    utter.rate = 1;
-    speechSynthesis.speak(utter);
+  // 🧹 CLEANER ANSWER RENDERER - Fixes ** and | tables
+  const renderClean = (text: string) => {
+    // Remove ** and make bold
+    let clean = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+    
+    // If it's a markdown table with |, convert to clean list
+    if (clean.includes("|") && clean.includes("---")) {
+      const rows = clean.split("\n").filter(r => r.includes("|") && !r.includes("---") && r.trim() !== "");
+      let html = `<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px">`;
+      rows.forEach((row, idx) => {
+        if (idx === 0) return; // skip header
+        const cols = row.split("|").map(c => c.trim()).filter(Boolean);
+        if (cols.length >= 2) {
+          html += `<div style="background:#222; padding:8px 10px; border-radius:8px; border-left:3px solid #FFD700"><b>${cols[0].replace(/<[^>]*>/g, "")}</b><br/><small style="color:#aaa">${cols.slice(1).join(" • ")}</small></div>`;
+        }
+      });
+      html += `</div>`;
+      // Get title before table
+      const title = clean.split("|")[0].replace(/<[^>]*>/g, "");
+      return `<div>${title}</div>${html}`;
+    }
+    
+    // Clean normal text - convert \n to <br>
+    clean = clean.replace(/\n/g, "<br/>");
+    return clean;
   };
 
   const send = async () => {
     if (!input.trim()) return;
-    if (mode === "spicy" && !ageOk) {
-      if (!confirm("🔞 18+ ONLY - Spicy is flirty romantic. Confirm 18+?")) return;
-      setAgeOk(true);
-    }
     const userMsg: Msg = { role: "user", content: input, time: getTime() };
-    setMessages((m) => [...m, userMsg]);
-    const textToSend = input;
+    setMessages(m => [...m, userMsg]);
+    const txt = input;
     setInput("");
-
     try {
       const res = await fetch("/api/li", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: textToSend, mode, apiKey: "LI-sk-1wUOHWuJXCWKCDHNBMBtjXSjnirI" }),
+        body: JSON.stringify({ message: txt, mode: "clean", apiKey: "LI-sk-1wUOHWuJXCWKCDHNBMBtjXSjnirI" }),
       });
       const data = await res.json();
-      const cleanAnswer = (data.answer || "Thinking...").trim().replace(/\n{3,}/g, "\n\n");
-      const aiMsg: Msg = { role: "ai", content: cleanAnswer, time: getTime() };
-      setMessages((m) => [...m, aiMsg]);
-      if (mode === "spicy") speak(cleanAnswer.slice(0, 150)); // Voice reply in spicy mode
+      const aiMsg: Msg = { role: "ai", content: data.answer || "Thinking...", time: getTime() };
+      setMessages(m => [...m, aiMsg]);
     } catch (e) {
-      setMessages((m) => [...m, { role: "ai", content: "Error: " + String(e), time: getTime() }]);
+      setMessages(m => [...m, { role: "ai", content: "Error: " + String(e), time: getTime() }]);
     }
   };
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", background: "#000", color: "#fff", fontFamily: "system-ui" }}>
-      {/* HEADER WITH MODE */}
-      <div style={{ padding: 12, borderBottom: "1px solid #222", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div><b>🧬 LARDI AI</b><div style={{ fontSize: 10, color: "#aaa" }}>{mode === "spicy" ? "🔥 SPICY • 18+" : "✨ CLEAN • lardi-ai.vercel.app"}</div></div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setMode("clean")} style={{ padding: "6px 12px", borderRadius: 20, border: "none", background: mode === "clean" ? "#FFD700" : "#222", color: mode === "clean" ? "#000" : "#fff", fontSize: 12, cursor: "pointer" }}>✨ Clean</button>
-          <button onClick={() => setMode("spicy")} style={{ padding: "6px 12px", borderRadius: 20, border: "none", background: mode === "spicy" ? "#ff1a75" : "#222", color: "#fff", fontSize: 12, cursor: "pointer" }}>🔥 Spicy</button>
+    <div style={{ maxWidth: 480, margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", background: "#000", color: "#fff", fontFamily: "system-ui" }}>
+      
+      {/* TOP BAR - Like your screenshot */}
+      <div style={{ padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#000" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button style={{ background: "#1a1a1a", border: "none", borderRadius: "50%", width: 44, height: 44, color: "#FFD700", fontSize: 20 }}>☰</button>
+          <button onClick={startMic} style={{ background: listening ? "#ff0000" : "#FFD700", border: "none", borderRadius: "50%", width: 44, height: 44, fontSize: 18 }}>{listening ? "🔴" : "🎙️"}</button>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button style={{ background: "#00c950", border: "none", borderRadius: "50%", width: 44, height: 44, fontSize: 18 }}>📞</button>
+          <button style={{ background: "#ff0000", border: "none", borderRadius: 20, padding: "8px 14px", color: "#fff", fontWeight: "bold", fontSize: 12 }}>EXIT X</button>
         </div>
       </div>
 
-      {/* CHAT BUBBLES WITH TIME */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-        {messages.length === 0 && <div style={{ textAlign: "center", color: "#555", marginTop: 60 }}>👋 Hello Boss!<br />Ask me anything<br /><small>{new Date().toLocaleDateString()}</small></div>}
+      {/* TITLE */}
+      <div style={{ textAlign: "center", padding: "6px 0 10px 0" }}>
+        <div style={{ fontSize: 22, fontWeight: "900", color: "#FFD700" }}>🇬🇭 LARDI AI</div>
+        <div style={{ fontSize: 13, color: "#FFD700" }}>Mama Lardi 💙 |Built by Albert 🔥</div>
+        <img src="https://i.imgur.com/8Km9tLL.png" alt="Mama Lardi" onError={(e:any)=>e.target.style.display='none'} style={{ width: 90, height: 90, borderRadius: "50%", border: "3px solid #FFD700", marginTop: 8, objectFit: "cover", background: "#222" }} />
+        {/* If image fails, show emoji */}
+      </div>
+
+      {/* CHAT AREA - With time in bubble like your 23:27 */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 12, background: "#000" }}>
         {messages.map((m, i) => (
-          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", display: "flex", flexDirection: "column" }}>
-            <div style={{ background: m.role === "user" ? (mode === "spicy" ? "#ff1a75" : "#FFD700") : "#161616", color: m.role === "user" ? "#fff" : "#fff", padding: "11px 14px", borderRadius: 18, whiteSpace: "pre-wrap", lineHeight: "1.5", fontSize: 14, border: m.role === "ai" ? "1px solid #222" : "none" }}>{m.content}</div>
-            <div style={{ fontSize: 10, color: "#666", marginTop: 5, display: "flex", gap: 6, justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-              <span>🕒 {m.time}</span><span>•</span><span>{m.role === "ai" ? (mode === "spicy" ? "🔥 LI" : "LI") : "You"}</span>
-              {m.role === "ai" && <button onClick={() => speak(m.content)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 10 }}>🔊</button>}
-            </div>
+          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "92%", position: "relative" }}>
+            {m.role === "user" ? (
+              <div style={{ background: "#FFD700", color: "#000", padding: "10px 12px", borderRadius: 18, borderBottomRightRadius: 4, fontSize: 14 }}>{m.content}
+                <div style={{ fontSize: 10, color: "#333", textAlign: "right", marginTop: 4 }}>🕒 {m.time} • You</div>
+              </div>
+            ) : (
+              <div style={{ background: "#1a1a0a", borderLeft: "3px solid #FFD700", padding: "10px 12px", borderRadius: 12, fontSize: 13.5, lineHeight: "1.5" }}>
+                <div dangerouslySetInnerHTML={{ __html: renderClean(m.content) }} />
+                <div style={{ fontSize: 10, color: "#666", textAlign: "right", marginTop: 8, borderTop: "1px solid #222", paddingTop: 4 }}>🕒 {m.time} • LI • {new Date().toLocaleDateString("en-GH")}</div>
+              </div>
+            )}
           </div>
         ))}
         <div ref={endRef} />
       </div>
 
-      {/* INPUT WITH 🎙 LIKE CHATGPT */}
-      <div style={{ padding: 12, borderTop: "1px solid #222", display: "flex", gap: 8, alignItems: "center", background: "#000" }}>
-        <button onClick={startMic} title="Tap to speak" style={{ background: listening ? "#ff0000" : "#222", border: "none", borderRadius: "50%", width: 46, height: 46, fontSize: 20, cursor: "pointer" }}>{listening ? "🔴" : "🎙"}</button>
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={listening ? "🎙 Listening... speak!" : mode === "spicy" ? "Flirt with LI..." : "Ask LARDI..."} style={{ flex: 1, padding: "13px 16px", borderRadius: 24, border: "1px solid #333", background: "#111", color: "#fff", outline: "none" }} />
-        <button onClick={send} style={{ background: mode === "spicy" ? "#ff1a75" : "#FFD700", border: "none", borderRadius: 24, padding: "13px 20px", fontWeight: "bold", cursor: "pointer", color: mode === "spicy" ? "#fff" : "#000" }}>➤</button>
+      {/* BOTTOM INPUT - Like your screenshot + 🎙 */}
+      <div style={{ padding: "10px 10px 16px 10px", background: "#000", borderTop: "1px solid #111", display: "flex", gap: 8, alignItems: "center" }}>
+        <button style={{ background: "#1a1a1a", border: "none", borderRadius: "50%", width: 44, height: 44, color: "#888", fontSize: 18 }}>📎</button>
+        
+        {/* 🎙 MIC BUTTON - ChatGPT style when tap ready */}
+        <button onClick={startMic} style={{ background: listening ? "#ff0000" : "#1a1a1a", border: "none", borderRadius: "50%", width: 44, height: 44, fontSize: 16 }}>{listening ? "🔴" : "🎙"}</button>
+        
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder={listening ? "🎙 Listening..." : "Ask or type: Picture of anythi"} style={{ flex: 1, padding: "12px 16px", borderRadius: 24, border: "1px solid #222", background: "#111", color: "#fff", outline: "none", fontSize: 14 }} />
+        
+        <button onClick={send} style={{ background: "#FFD700", border: "none", borderRadius: "50%", width: 46, height: 46, fontSize: 18, fontWeight: "bold", cursor: "pointer" }}>↑</button>
       </div>
-      {listening && <div style={{ textAlign: "center", color: "#ff1a75", fontSize: 12, paddingBottom: 8, animation: "pulse 1s infinite" }}>🎙 Listening... Tap 🔴 to stop</div>}
+
+      {listening && <div style={{ textAlign: "center", color: "#FFD700", fontSize: 12, paddingBottom: 10 }}>🎙 Ready like ChatGPT... Speak now Boss!</div>}
     </div>
   );
 }
